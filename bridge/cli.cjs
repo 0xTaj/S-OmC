@@ -105375,6 +105375,8 @@ var import_child_process40 = require("child_process");
 var import_fs118 = require("fs");
 var import_os22 = require("os");
 var import_path138 = require("path");
+init_atomic_write();
+init_file_lock();
 init_mcp_registry();
 init_config_dir();
 init_tmux_utils();
@@ -105427,6 +105429,9 @@ function ensureMirroredPath(sourcePath, targetPath, options = {}) {
 function isJsonObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
 function readJsonObject4(path25) {
   try {
     const parsed = JSON.parse((0, import_fs118.readFileSync)(path25, "utf-8"));
@@ -105435,15 +105440,247 @@ function readJsonObject4(path25) {
     return null;
   }
 }
-function refreshRuntimeClaudeJsonMcpServers(baseConfigDir, runtimeClaudeJsonPath) {
-  const sourceClaudeJsonPath = (0, import_path138.join)((0, import_path138.dirname)(baseConfigDir), ".claude.json");
-  const sourceClaudeJson = readJsonObject4(sourceClaudeJsonPath);
-  if (!sourceClaudeJson || !isJsonObject(sourceClaudeJson.mcpServers)) {
+var OAUTH_CREDENTIAL_FIELDS = [
+  "accessToken",
+  "refreshToken",
+  "expiresAt",
+  "scopes",
+  "subscriptionType",
+  "rateLimitTier",
+  "organizationUuid",
+  "accountUuid",
+  "emailAddress",
+  "email",
+  "hasExtraUsageEnabled"
+];
+function extractOAuthCandidate(parsed) {
+  const inspect = (record2, nested) => {
+    const accessToken = record2.accessToken;
+    const expiresAt = record2.expiresAt;
+    if (typeof accessToken !== "string" || accessToken.trim().length === 0) return null;
+    if (typeof expiresAt !== "number" || !Number.isFinite(expiresAt)) return null;
+    const fields = {};
+    for (const key of OAUTH_CREDENTIAL_FIELDS) {
+      if (hasOwn(record2, key)) fields[key] = record2[key];
+    }
+    return { nested, expiresAt, fields };
+  };
+  if (isJsonObject(parsed.claudeAiOauth)) {
+    const nestedCandidate = inspect(parsed.claudeAiOauth, true);
+    if (nestedCandidate) return nestedCandidate;
+  }
+  return inspect(parsed, false);
+}
+function hasLinkableCredentials(inspection) {
+  if (inspection.candidate) return true;
+  if (!inspection.parsed) return false;
+  const source = isJsonObject(inspection.parsed.claudeAiOauth) ? inspection.parsed.claudeAiOauth : inspection.parsed;
+  return typeof source.accessToken === "string" && source.accessToken.trim().length > 0;
+}
+function inspectCredentialFile(path25) {
+  let stat2;
+  try {
+    stat2 = (0, import_fs118.lstatSync)(path25);
+  } catch (error2) {
+    const code = error2 && typeof error2 === "object" && "code" in error2 ? error2.code : void 0;
+    if (code !== "ENOENT" && code !== "ENOTDIR") {
+      return { exists: true, regularFile: false, readable: false, valid: false, parsed: null, candidate: null };
+    }
+    return { exists: false, regularFile: false, readable: false, valid: false, parsed: null, candidate: null };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse((0, import_fs118.readFileSync)(path25, "utf-8"));
+  } catch {
+    return {
+      exists: true,
+      regularFile: stat2.isFile(),
+      readable: false,
+      valid: false,
+      parsed: null,
+      candidate: null
+    };
+  }
+  if (!isJsonObject(parsed)) {
+    return {
+      exists: true,
+      regularFile: stat2.isFile(),
+      readable: true,
+      valid: false,
+      parsed: null,
+      candidate: null
+    };
+  }
+  return {
+    exists: true,
+    regularFile: stat2.isFile(),
+    readable: true,
+    valid: true,
+    parsed,
+    candidate: extractOAuthCandidate(parsed)
+  };
+}
+function credentialExpiry(parsed) {
+  const source = isJsonObject(parsed.claudeAiOauth) ? parsed.claudeAiOauth : parsed;
+  const expiresAt = source.expiresAt;
+  return typeof expiresAt === "number" && Number.isFinite(expiresAt) ? expiresAt : null;
+}
+function resolveCredentialWritePath(path25) {
+  try {
+    if (!(0, import_fs118.lstatSync)(path25).isSymbolicLink()) return path25;
+    const target = (0, import_fs118.readlinkSync)(path25);
+    return (0, import_path138.isAbsolute)(target) ? target : (0, import_path138.join)((0, import_path138.dirname)(path25), target);
+  } catch {
+    return path25;
+  }
+}
+function accountIdentity(value) {
+  if (!isJsonObject(value)) return null;
+  for (const key of ["accountUuid", "emailAddress", "email"]) {
+    const candidate = value[key];
+    if (typeof candidate === "string" && candidate.trim().length > 0) return candidate.trim();
+  }
+  return null;
+}
+function accountIdentitiesDiffer(sourceClaudeJson, runtimeClaudeJson) {
+  const sourceIdentity = accountIdentity(sourceClaudeJson?.oauthAccount);
+  const runtimeIdentity = accountIdentity(runtimeClaudeJson?.oauthAccount);
+  return sourceIdentity !== null && runtimeIdentity !== null && sourceIdentity !== runtimeIdentity;
+}
+function onboardingVersionNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function refreshRuntimeClaudeJson(baseConfigDir, runtimeClaudeJsonPath, sourceClaudeJson = readJsonObject4((0, import_path138.join)((0, import_path138.dirname)(baseConfigDir), ".claude.json"))) {
+  if (!sourceClaudeJson) return;
+  const runtimeClaudeJson = readJsonObject4(runtimeClaudeJsonPath) ?? {};
+  let changed = false;
+  if (sourceClaudeJson.hasCompletedOnboarding === true && runtimeClaudeJson.hasCompletedOnboarding !== true) {
+    runtimeClaudeJson.hasCompletedOnboarding = true;
+    changed = true;
+  }
+  const sourceVersion = sourceClaudeJson.lastOnboardingVersion;
+  if (typeof sourceVersion === "string" || typeof sourceVersion === "number") {
+    const runtimeHasVersion = hasOwn(runtimeClaudeJson, "lastOnboardingVersion");
+    const runtimeVersion = onboardingVersionNumber(runtimeClaudeJson.lastOnboardingVersion);
+    const sourceVersionNumber = onboardingVersionNumber(sourceVersion);
+    if (!runtimeHasVersion || sourceVersionNumber !== null && (runtimeVersion === null || sourceVersionNumber > runtimeVersion)) {
+      runtimeClaudeJson.lastOnboardingVersion = sourceVersion;
+      changed = true;
+    }
+  }
+  if (hasOwn(sourceClaudeJson, "oauthAccount")) {
+    const sourceAccount = sourceClaudeJson.oauthAccount;
+    if (sourceAccount === null || sourceAccount === void 0) {
+      if (hasOwn(runtimeClaudeJson, "oauthAccount")) {
+        delete runtimeClaudeJson.oauthAccount;
+        changed = true;
+      }
+    } else if (!hasOwn(runtimeClaudeJson, "oauthAccount")) {
+      runtimeClaudeJson.oauthAccount = sourceAccount;
+      changed = true;
+    } else {
+      const sourceIdentity = accountIdentity(sourceAccount);
+      const runtimeIdentity = accountIdentity(runtimeClaudeJson.oauthAccount);
+      if (sourceIdentity !== null && runtimeIdentity !== null && sourceIdentity !== runtimeIdentity) {
+        runtimeClaudeJson.oauthAccount = sourceAccount;
+        changed = true;
+      }
+    }
+  }
+  if (isJsonObject(sourceClaudeJson.mcpServers)) {
+    runtimeClaudeJson.mcpServers = sourceClaudeJson.mcpServers;
+    changed = true;
+  }
+  if (changed) {
+    (0, import_fs118.writeFileSync)(runtimeClaudeJsonPath, JSON.stringify(runtimeClaudeJson, null, 2));
+  }
+}
+function ensureMirroredCredentials(sourcePath, targetPath, hasEligibleSourceCredentials) {
+  if (!(0, import_fs118.existsSync)(sourcePath)) return;
+  const removeExistingTarget = () => {
+    try {
+      (0, import_fs118.lstatSync)(targetPath);
+      (0, import_fs118.rmSync)(targetPath, { recursive: true, force: true });
+    } catch {
+    }
+  };
+  removeExistingTarget();
+  try {
+    (0, import_fs118.symlinkSync)(sourcePath, targetPath, "file");
+    return;
+  } catch {
+    removeExistingTarget();
+  }
+  try {
+    (0, import_fs118.linkSync)(sourcePath, targetPath);
+    return;
+  } catch {
+    removeExistingTarget();
+    if (hasEligibleSourceCredentials) {
+      throw new Error("Unable to mirror Claude credentials without copying credential content");
+    }
+  }
+}
+function pathExists(path25) {
+  try {
+    (0, import_fs118.lstatSync)(path25);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function reconcileRuntimeCredentials(baseConfigDir, runtimeCredentialsPath, sourceClaudeJson, preservedRuntimeClaudeJson) {
+  const runtimeInspection = inspectCredentialFile(runtimeCredentialsPath);
+  const runtimeCandidate = runtimeInspection.candidate;
+  if (!runtimeCandidate) return;
+  const baseCredentialsPath = (0, import_path138.join)(baseConfigDir, ".credentials.json");
+  const baseInspection = inspectCredentialFile(baseCredentialsPath);
+  if (!baseInspection.exists) return;
+  if (!baseInspection.readable || !baseInspection.valid || !baseInspection.parsed) {
+    if (runtimeInspection.regularFile) {
+      throw new Error("Unable to read or parse base Claude credentials");
+    }
     return;
   }
-  const runtimeClaudeJson = readJsonObject4(runtimeClaudeJsonPath) ?? {};
-  runtimeClaudeJson.mcpServers = sourceClaudeJson.mcpServers;
-  (0, import_fs118.writeFileSync)(runtimeClaudeJsonPath, JSON.stringify(runtimeClaudeJson, null, 2));
+  const baseExpiresAt = credentialExpiry(baseInspection.parsed);
+  if (baseExpiresAt === null || runtimeCandidate.expiresAt <= baseExpiresAt) return;
+  if (accountIdentitiesDiffer(sourceClaudeJson, preservedRuntimeClaudeJson)) return;
+  const mergedBaseCredentials = { ...baseInspection.parsed };
+  if (hasOwn(baseInspection.parsed, "claudeAiOauth") || runtimeCandidate.nested) {
+    const existingNested = isJsonObject(baseInspection.parsed.claudeAiOauth) ? baseInspection.parsed.claudeAiOauth : {};
+    mergedBaseCredentials.claudeAiOauth = { ...existingNested, ...runtimeCandidate.fields };
+  } else {
+    Object.assign(mergedBaseCredentials, runtimeCandidate.fields);
+  }
+  atomicWriteJsonSync(resolveCredentialWritePath(baseCredentialsPath), mergedBaseCredentials);
+}
+function swapRuntimeConfigDir(runtimeConfigDir, nextConfigDir) {
+  const previousConfigDir = `${runtimeConfigDir}.prev`;
+  let movedPrevious = false;
+  try {
+    (0, import_fs118.rmSync)(previousConfigDir, { recursive: true, force: true });
+    if (pathExists(runtimeConfigDir)) {
+      (0, import_fs118.renameSync)(runtimeConfigDir, previousConfigDir);
+      movedPrevious = true;
+    }
+    (0, import_fs118.renameSync)(nextConfigDir, runtimeConfigDir);
+  } catch (error2) {
+    try {
+      if (movedPrevious && !pathExists(runtimeConfigDir) && pathExists(previousConfigDir)) {
+        (0, import_fs118.renameSync)(previousConfigDir, runtimeConfigDir);
+      }
+    } catch {
+    }
+    (0, import_fs118.rmSync)(nextConfigDir, { recursive: true, force: true });
+    throw error2;
+  }
+  try {
+    (0, import_fs118.rmSync)(previousConfigDir, { recursive: true, force: true });
+  } catch {
+  }
 }
 function prepareOmcLaunchConfigDir(baseConfigDir = getClaudeConfigDir()) {
   const companionPath = (0, import_path138.join)(baseConfigDir, "CLAUDE-omc.md");
@@ -105451,55 +105688,81 @@ function prepareOmcLaunchConfigDir(baseConfigDir = getClaudeConfigDir()) {
     return baseConfigDir;
   }
   const runtimeConfigDir = (0, import_path138.join)(baseConfigDir, OMC_RUNTIME_DIRNAME);
+  const nextConfigDir = `${runtimeConfigDir}.next`;
   const runtimeClaudeJsonPath = (0, import_path138.join)(runtimeConfigDir, ".claude.json");
-  const preservedClaudeJson = (0, import_fs118.existsSync)(runtimeClaudeJsonPath) ? (0, import_fs118.readFileSync)(runtimeClaudeJsonPath) : null;
-  (0, import_fs118.rmSync)(runtimeConfigDir, { recursive: true, force: true });
-  (0, import_fs118.mkdirSync)(runtimeConfigDir, { recursive: true });
-  if (preservedClaudeJson) {
-    (0, import_fs118.writeFileSync)(runtimeClaudeJsonPath, preservedClaudeJson);
-  }
-  refreshRuntimeClaudeJsonMcpServers(baseConfigDir, runtimeClaudeJsonPath);
-  (0, import_fs118.copyFileSync)(companionPath, (0, import_path138.join)(runtimeConfigDir, "CLAUDE.md"));
-  for (const entry of [
-    "agents",
-    "commands",
-    "hooks",
-    "hud",
-    "plugins",
-    "projects",
-    "rules",
-    "skills",
-    "themes",
-    OMC_CONFIG_FILE_REL,
-    ".omc-version.json",
-    ".omc-silent-update.json",
-    "keybindings.json",
-    "settings.json",
-    "settings.local.json",
-    ".credentials.json"
-  ]) {
-    ensureMirroredPath(
-      (0, import_path138.join)(baseConfigDir, entry),
-      (0, import_path138.join)(runtimeConfigDir, (0, import_path138.basename)(entry)),
-      { allowCopyFallback: entry !== ".credentials.json" }
+  const runtimeCredentialsPath = (0, import_path138.join)(runtimeConfigDir, ".credentials.json");
+  const sourceClaudeJsonPath = (0, import_path138.join)((0, import_path138.dirname)(baseConfigDir), ".claude.json");
+  const lifecycleLockPath = lockPathFor((0, import_path138.join)(baseConfigDir, ".omc-launch.prepare.lock"));
+  return withFileLockSync(lifecycleLockPath, () => {
+    const preservedClaudeJson = pathExists(runtimeClaudeJsonPath) ? (0, import_fs118.readFileSync)(runtimeClaudeJsonPath) : null;
+    const preservedRuntimeClaudeJson = readJsonObject4(runtimeClaudeJsonPath);
+    const sourceClaudeJson = readJsonObject4(sourceClaudeJsonPath);
+    reconcileRuntimeCredentials(
+      baseConfigDir,
+      runtimeCredentialsPath,
+      sourceClaudeJson,
+      preservedRuntimeClaudeJson
     );
-  }
-  const runtimeSettingsPath = (0, import_path138.join)(runtimeConfigDir, "settings.json");
-  if ((0, import_fs118.existsSync)(runtimeSettingsPath)) {
+    (0, import_fs118.rmSync)(nextConfigDir, { recursive: true, force: true });
     try {
-      const rawSettings = JSON.parse((0, import_fs118.readFileSync)(runtimeSettingsPath, "utf-8"));
-      const repaired = stripRetiredTeamMcpServers(rawSettings);
-      if (repaired.changed) {
-        (0, import_fs118.writeFileSync)(runtimeSettingsPath, JSON.stringify(repaired.settings, null, 2));
+      (0, import_fs118.mkdirSync)(nextConfigDir, { recursive: true });
+      const nextClaudeJsonPath = (0, import_path138.join)(nextConfigDir, ".claude.json");
+      if (preservedClaudeJson) {
+        (0, import_fs118.writeFileSync)(nextClaudeJsonPath, preservedClaudeJson);
       }
-    } catch {
+      refreshRuntimeClaudeJson(baseConfigDir, nextClaudeJsonPath, sourceClaudeJson);
+      (0, import_fs118.copyFileSync)(companionPath, (0, import_path138.join)(nextConfigDir, "CLAUDE.md"));
+      for (const entry of [
+        "agents",
+        "commands",
+        "hooks",
+        "hud",
+        "plugins",
+        "projects",
+        "rules",
+        "skills",
+        "themes",
+        OMC_CONFIG_FILE_REL,
+        ".omc-version.json",
+        ".omc-silent-update.json",
+        "keybindings.json",
+        "settings.json",
+        "settings.local.json"
+      ]) {
+        ensureMirroredPath(
+          (0, import_path138.join)(baseConfigDir, entry),
+          (0, import_path138.join)(nextConfigDir, (0, import_path138.basename)(entry))
+        );
+      }
+      const baseCredentialsPath = (0, import_path138.join)(baseConfigDir, ".credentials.json");
+      const baseCredentialInspection = inspectCredentialFile(baseCredentialsPath);
+      ensureMirroredCredentials(
+        baseCredentialsPath,
+        (0, import_path138.join)(nextConfigDir, ".credentials.json"),
+        hasLinkableCredentials(baseCredentialInspection)
+      );
+      const runtimeSettingsPath = (0, import_path138.join)(nextConfigDir, "settings.json");
+      if ((0, import_fs118.existsSync)(runtimeSettingsPath)) {
+        try {
+          const rawSettings = JSON.parse((0, import_fs118.readFileSync)(runtimeSettingsPath, "utf-8"));
+          const repaired = stripRetiredTeamMcpServers(rawSettings);
+          if (repaired.changed) {
+            (0, import_fs118.writeFileSync)(runtimeSettingsPath, JSON.stringify(repaired.settings, null, 2));
+          }
+        } catch {
+        }
+      }
+      (0, import_fs118.writeFileSync)(
+        (0, import_path138.join)(nextConfigDir, ".omc-launch-profile.json"),
+        JSON.stringify({ sourceConfigDir: baseConfigDir, sourceClaudeMd: companionPath }, null, 2)
+      );
+    } catch (error2) {
+      (0, import_fs118.rmSync)(nextConfigDir, { recursive: true, force: true });
+      throw error2;
     }
-  }
-  (0, import_fs118.writeFileSync)(
-    (0, import_path138.join)(runtimeConfigDir, ".omc-launch-profile.json"),
-    JSON.stringify({ sourceConfigDir: baseConfigDir, sourceClaudeMd: companionPath }, null, 2)
-  );
-  return runtimeConfigDir;
+    swapRuntimeConfigDir(runtimeConfigDir, nextConfigDir);
+    return runtimeConfigDir;
+  }, { timeoutMs: 5e3, retryDelayMs: 50 });
 }
 function isDefaultClaudeConfigDirPath2(configDir) {
   return configDir === (0, import_path138.join)((0, import_os22.homedir)(), ".claude");
