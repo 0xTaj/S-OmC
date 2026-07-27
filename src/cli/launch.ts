@@ -229,38 +229,64 @@ function credentialExpiry(parsed: Record<string, unknown>): number | null {
 }
 
 function resolveCredentialWritePath(path: string): string {
-  try {
-    if (!lstatSync(path).isSymbolicLink()) return path;
-    const target = readlinkSync(path);
-    return isAbsolute(target) ? target : join(dirname(path), target);
-  } catch {
-    return path;
+  let current = path;
+  for (let depth = 0; depth < 16; depth += 1) {
+    try {
+      if (!lstatSync(current).isSymbolicLink()) return current;
+      const target = readlinkSync(current);
+      current = isAbsolute(target) ? target : join(dirname(current), target);
+    } catch {
+      return current;
+    }
   }
+  return current;
 }
 
-function accountIdentity(value: unknown): string | null {
-  if (!isJsonObject(value)) return null;
-  for (const key of ['accountUuid', 'emailAddress', 'email']) {
-    const candidate = value[key];
-    if (typeof candidate === 'string' && candidate.trim().length > 0) return candidate.trim();
-  }
-  return null;
-}
-
-function accountIdentitiesDiffer(
+/** True only when source and runtime can be proven to be the same account. */
+function accountsProvenSame(
   sourceClaudeJson: Record<string, unknown> | null,
   runtimeClaudeJson: Record<string, unknown> | null,
 ): boolean {
-  const sourceIdentity = accountIdentity(sourceClaudeJson?.oauthAccount);
-  const runtimeIdentity = accountIdentity(runtimeClaudeJson?.oauthAccount);
-  return sourceIdentity !== null && runtimeIdentity !== null && sourceIdentity !== runtimeIdentity;
+  const sourceAccount = isJsonObject(sourceClaudeJson?.oauthAccount) ? sourceClaudeJson.oauthAccount : null;
+  const runtimeAccount = isJsonObject(runtimeClaudeJson?.oauthAccount) ? runtimeClaudeJson.oauthAccount : null;
+  if (!sourceAccount || !runtimeAccount) return false;
+
+  let compared = false;
+  for (const key of ['accountUuid', 'emailAddress', 'email'] as const) {
+    const sourceValue = sourceAccount[key];
+    const runtimeValue = runtimeAccount[key];
+    const sourceId = typeof sourceValue === 'string' ? sourceValue.trim() : '';
+    const runtimeId = typeof runtimeValue === 'string' ? runtimeValue.trim() : '';
+    if (!sourceId || !runtimeId) continue;
+    compared = true;
+    if (sourceId !== runtimeId) return false;
+  }
+  return compared;
 }
 
-function onboardingVersionNumber(value: unknown): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string' || value.trim().length === 0) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+function compareOnboardingVersion(left: unknown, right: unknown): number | null {
+  const toParts = (value: unknown): number[] | null => {
+    if (typeof value === 'number') return Number.isFinite(value) ? [value] : null;
+    if (typeof value !== 'string' || value.trim().length === 0) return null;
+    const parts = value.trim().split(/[.+-]/).map((part) => {
+      if (part.length === 0 || !/^\d+$/.test(part)) return Number.NaN;
+      return Number(part);
+    });
+    if (parts.some((part) => !Number.isFinite(part))) return null;
+    return parts;
+  };
+
+  const leftParts = toParts(left);
+  const rightParts = toParts(right);
+  if (!leftParts || !rightParts) return null;
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = leftParts[index] ?? 0;
+    const b = rightParts[index] ?? 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
 }
 
 function refreshRuntimeClaudeJson(
@@ -281,9 +307,8 @@ function refreshRuntimeClaudeJson(
   const sourceVersion = sourceClaudeJson.lastOnboardingVersion;
   if (typeof sourceVersion === 'string' || typeof sourceVersion === 'number') {
     const runtimeHasVersion = hasOwn(runtimeClaudeJson, 'lastOnboardingVersion');
-    const runtimeVersion = onboardingVersionNumber(runtimeClaudeJson.lastOnboardingVersion);
-    const sourceVersionNumber = onboardingVersionNumber(sourceVersion);
-    if (!runtimeHasVersion || (sourceVersionNumber !== null && (runtimeVersion === null || sourceVersionNumber > runtimeVersion))) {
+    const compared = compareOnboardingVersion(sourceVersion, runtimeClaudeJson.lastOnboardingVersion);
+    if (!runtimeHasVersion || (compared !== null && compared > 0)) {
       runtimeClaudeJson.lastOnboardingVersion = sourceVersion;
       changed = true;
     }
@@ -299,13 +324,10 @@ function refreshRuntimeClaudeJson(
     } else if (!hasOwn(runtimeClaudeJson, 'oauthAccount')) {
       runtimeClaudeJson.oauthAccount = sourceAccount;
       changed = true;
-    } else {
-      const sourceIdentity = accountIdentity(sourceAccount);
-      const runtimeIdentity = accountIdentity(runtimeClaudeJson.oauthAccount);
-      if (sourceIdentity !== null && runtimeIdentity !== null && sourceIdentity !== runtimeIdentity) {
-        runtimeClaudeJson.oauthAccount = sourceAccount;
-        changed = true;
-      }
+    } else if (!accountsProvenSame(sourceClaudeJson, runtimeClaudeJson)) {
+      // Prefer source account metadata when identities cannot be proven equal.
+      runtimeClaudeJson.oauthAccount = sourceAccount;
+      changed = true;
     }
   }
 
@@ -387,7 +409,8 @@ function reconcileRuntimeCredentials(
 
   const baseExpiresAt = credentialExpiry(baseInspection.parsed);
   if (baseExpiresAt === null || runtimeCandidate.expiresAt <= baseExpiresAt) return;
-  if (accountIdentitiesDiffer(sourceClaudeJson, preservedRuntimeClaudeJson)) return;
+  // Fail closed unless both sides prove the same account identity.
+  if (!accountsProvenSame(sourceClaudeJson, preservedRuntimeClaudeJson)) return;
 
   const mergedBaseCredentials = { ...baseInspection.parsed };
   if (hasOwn(baseInspection.parsed, 'claudeAiOauth') || runtimeCandidate.nested) {

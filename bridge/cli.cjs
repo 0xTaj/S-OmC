@@ -105526,32 +105526,56 @@ function credentialExpiry(parsed) {
   return typeof expiresAt === "number" && Number.isFinite(expiresAt) ? expiresAt : null;
 }
 function resolveCredentialWritePath(path25) {
-  try {
-    if (!(0, import_fs118.lstatSync)(path25).isSymbolicLink()) return path25;
-    const target = (0, import_fs118.readlinkSync)(path25);
-    return (0, import_path138.isAbsolute)(target) ? target : (0, import_path138.join)((0, import_path138.dirname)(path25), target);
-  } catch {
-    return path25;
+  let current = path25;
+  for (let depth = 0; depth < 16; depth += 1) {
+    try {
+      if (!(0, import_fs118.lstatSync)(current).isSymbolicLink()) return current;
+      const target = (0, import_fs118.readlinkSync)(current);
+      current = (0, import_path138.isAbsolute)(target) ? target : (0, import_path138.join)((0, import_path138.dirname)(current), target);
+    } catch {
+      return current;
+    }
   }
+  return current;
 }
-function accountIdentity(value) {
-  if (!isJsonObject(value)) return null;
+function accountsProvenSame(sourceClaudeJson, runtimeClaudeJson) {
+  const sourceAccount = isJsonObject(sourceClaudeJson?.oauthAccount) ? sourceClaudeJson.oauthAccount : null;
+  const runtimeAccount = isJsonObject(runtimeClaudeJson?.oauthAccount) ? runtimeClaudeJson.oauthAccount : null;
+  if (!sourceAccount || !runtimeAccount) return false;
+  let compared = false;
   for (const key of ["accountUuid", "emailAddress", "email"]) {
-    const candidate = value[key];
-    if (typeof candidate === "string" && candidate.trim().length > 0) return candidate.trim();
+    const sourceValue = sourceAccount[key];
+    const runtimeValue = runtimeAccount[key];
+    const sourceId = typeof sourceValue === "string" ? sourceValue.trim() : "";
+    const runtimeId = typeof runtimeValue === "string" ? runtimeValue.trim() : "";
+    if (!sourceId || !runtimeId) continue;
+    compared = true;
+    if (sourceId !== runtimeId) return false;
   }
-  return null;
+  return compared;
 }
-function accountIdentitiesDiffer(sourceClaudeJson, runtimeClaudeJson) {
-  const sourceIdentity = accountIdentity(sourceClaudeJson?.oauthAccount);
-  const runtimeIdentity = accountIdentity(runtimeClaudeJson?.oauthAccount);
-  return sourceIdentity !== null && runtimeIdentity !== null && sourceIdentity !== runtimeIdentity;
-}
-function onboardingVersionNumber(value) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value !== "string" || value.trim().length === 0) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+function compareOnboardingVersion(left, right) {
+  const toParts = (value) => {
+    if (typeof value === "number") return Number.isFinite(value) ? [value] : null;
+    if (typeof value !== "string" || value.trim().length === 0) return null;
+    const parts = value.trim().split(/[.+-]/).map((part) => {
+      if (part.length === 0 || !/^\d+$/.test(part)) return Number.NaN;
+      return Number(part);
+    });
+    if (parts.some((part) => !Number.isFinite(part))) return null;
+    return parts;
+  };
+  const leftParts = toParts(left);
+  const rightParts = toParts(right);
+  if (!leftParts || !rightParts) return null;
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = leftParts[index] ?? 0;
+    const b = rightParts[index] ?? 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
 }
 function refreshRuntimeClaudeJson(baseConfigDir, runtimeClaudeJsonPath, sourceClaudeJson = readJsonObject4((0, import_path138.join)((0, import_path138.dirname)(baseConfigDir), ".claude.json"))) {
   if (!sourceClaudeJson) return;
@@ -105564,9 +105588,8 @@ function refreshRuntimeClaudeJson(baseConfigDir, runtimeClaudeJsonPath, sourceCl
   const sourceVersion = sourceClaudeJson.lastOnboardingVersion;
   if (typeof sourceVersion === "string" || typeof sourceVersion === "number") {
     const runtimeHasVersion = hasOwn(runtimeClaudeJson, "lastOnboardingVersion");
-    const runtimeVersion = onboardingVersionNumber(runtimeClaudeJson.lastOnboardingVersion);
-    const sourceVersionNumber = onboardingVersionNumber(sourceVersion);
-    if (!runtimeHasVersion || sourceVersionNumber !== null && (runtimeVersion === null || sourceVersionNumber > runtimeVersion)) {
+    const compared = compareOnboardingVersion(sourceVersion, runtimeClaudeJson.lastOnboardingVersion);
+    if (!runtimeHasVersion || compared !== null && compared > 0) {
       runtimeClaudeJson.lastOnboardingVersion = sourceVersion;
       changed = true;
     }
@@ -105581,13 +105604,9 @@ function refreshRuntimeClaudeJson(baseConfigDir, runtimeClaudeJsonPath, sourceCl
     } else if (!hasOwn(runtimeClaudeJson, "oauthAccount")) {
       runtimeClaudeJson.oauthAccount = sourceAccount;
       changed = true;
-    } else {
-      const sourceIdentity = accountIdentity(sourceAccount);
-      const runtimeIdentity = accountIdentity(runtimeClaudeJson.oauthAccount);
-      if (sourceIdentity !== null && runtimeIdentity !== null && sourceIdentity !== runtimeIdentity) {
-        runtimeClaudeJson.oauthAccount = sourceAccount;
-        changed = true;
-      }
+    } else if (!accountsProvenSame(sourceClaudeJson, runtimeClaudeJson)) {
+      runtimeClaudeJson.oauthAccount = sourceAccount;
+      changed = true;
     }
   }
   if (isJsonObject(sourceClaudeJson.mcpServers)) {
@@ -105647,7 +105666,7 @@ function reconcileRuntimeCredentials(baseConfigDir, runtimeCredentialsPath, sour
   }
   const baseExpiresAt = credentialExpiry(baseInspection.parsed);
   if (baseExpiresAt === null || runtimeCandidate.expiresAt <= baseExpiresAt) return;
-  if (accountIdentitiesDiffer(sourceClaudeJson, preservedRuntimeClaudeJson)) return;
+  if (!accountsProvenSame(sourceClaudeJson, preservedRuntimeClaudeJson)) return;
   const mergedBaseCredentials = { ...baseInspection.parsed };
   if (hasOwn(baseInspection.parsed, "claudeAiOauth") || runtimeCandidate.nested) {
     const existingNested = isJsonObject(baseInspection.parsed.claudeAiOauth) ? baseInspection.parsed.claudeAiOauth : {};
