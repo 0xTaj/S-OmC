@@ -1349,54 +1349,60 @@
       "pullNumber": 3588,
       "targetRef": "dev",
       "mergeBaseSha": "3219495628cbf7680632f37e261351929508f295",
-      "headSha": "a3aac1084fea6182f0e85d1b596204a0adb213d2",
+      "headSha": "ec957a82679842cffa6f05ec99611b0bd66d08b5",
       "owner": "Yeachan-Heo",
       "expiresAt": "2026-08-12T00:00:00.000Z",
       "generatedDelta": {
-        "count": 20,
-        "sha256": "fd7b7719f50caaeaa0a18caf9bb15d2bff6e654344565bc7226d73da4cd493e1"
+        "count": 26,
+        "sha256": "6cf90633cb22fd95fd4ead28fe318e5486e5e900b505dab02b5d0471e94faa20"
       },
       "generatedFiles": [
         {
           "status": "modified",
           "filename": "bridge/cli.cjs",
-          "sha": "4efc37ae54c9c842ab629e2a099c6949afb393c2",
+          "sha": "a50096a54e2e1a0d7a82c0b4ef1095119ee8ba84",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/runtime-cli.cjs",
-          "sha": "b15ff9e69cfa220dc8ea0e73849ab5d876db9007",
+          "sha": "daddf3ea59e5d9a554675dcee943279348c34d99",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/team-bridge.cjs",
-          "sha": "4d3f8ebef1b9f2a9f94e857b6d615713384c281a",
+          "sha": "4c25ee5a53f9a27a430a7d10ae6c0c917ce2bdde",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/team-mcp.cjs",
-          "sha": "ae52fb1d105f6cd50cb9e57e53b0150621a02327",
+          "sha": "ecbee86bd37bb8ba83b968986c993b632ee6b306",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/team.js",
-          "sha": "55d3b8b5dfda3cfef618792044b916fecb513445",
+          "sha": "62e303af09fade0595048fa01f7df951a39981a6",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/index.d.ts",
-          "sha": "c65765ebb43f1daec5e8b94b95345b161404b6d2",
+          "sha": "a7b4ae6f0811a13aff6c54302bf26032d625e49a",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/index.js",
-          "sha": "43cc86c51f548e902b63ed70b3c50bcd1b43deef",
+          "sha": "c7e247002b408f349f36ebf6b14fac0b1c7d1de6",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/monitor.js",
+          "sha": "feef0b2951e16c0bac113ffb6c8d8f40637d27d1",
           "previousFilename": null
         },
         {
@@ -1432,49 +1438,79 @@
         {
           "status": "modified",
           "filename": "dist/team/runtime-v2.js",
-          "sha": "fd47589f2c9f5ec0fbdfb0ef7794f5aa7857a0c3",
+          "sha": "bbf8a52f200b596e20662d772c03f03c7510e033",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/state-paths.d.ts",
-          "sha": "4cea718388ef9795d7f6c5d39b6775aa11efdf2f",
+          "sha": "c856172f9f69955e939f5965baa370857499e073",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/state-paths.js",
-          "sha": "e63277a8e7dd20eb5e63e391e50c66fdba3dd1fd",
+          "sha": "1681f143d69734698863f24f714e2386b1093294",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/state/tasks.d.ts",
+          "sha": "a1005e1e0776bbf91254f47c3cc2f4348d64fdd6",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/state/tasks.js",
+          "sha": "be59a54641b9b897cfd598b7adb9fee8e107173f",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/team-ops.js",
+          "sha": "c7ea3a30a9ed26b56096b41f88d6c2543de86ab8",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/tmux-session.d.ts",
-          "sha": "cdf9ab83baf23d232e8d754374c845062f7aa38e",
+          "sha": "eb23d740d3b0ff1c3c8119190e6b7887c632831a",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/tmux-session.js",
-          "sha": "cd51d3c137ed98cf3c7d13bca36c287c1a2c0a8f",
+          "sha": "d124245bcef0335e1fd8d88ddf206b528d87c4b0",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/types.d.ts",
-          "sha": "2a73dd4ddd1054cb9c72ef23138792d88398058a",
+          "sha": "f049d689c78b82cb3145e1d59dddb118c899fa79",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/worker-activation-gate.js",
+          "sha": "810bba3e250dc44b5aab7308b323b4cb046bd199",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/worker-bootstrap.js",
+          "sha": "50add30c9bfb8e7e0a767243840d10086bc8d4b4",
           "previousFilename": null
         },
         {
           "status": "added",
           "filename": "dist/team/worker-launch-ack.d.ts",
-          "sha": "22334eb31dbbfbc6335ecc81d171cbd22746b51a",
+          "sha": "a64bfe0a4be73f9324c290cc0743a785342968e1",
           "previousFilename": null
         },
         {
           "status": "added",
           "filename": "dist/team/worker-launch-ack.js",
-          "sha": "f00ceb5193f8700084ee9ea0eb055e4a842a5c19",
+          "sha": "2a9466f679d3a8c533515d975eeae7dd6a137484",
           "previousFilename": null
         }
       ]
