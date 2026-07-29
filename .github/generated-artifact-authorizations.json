@@ -1312,6 +1312,32 @@
           "previousFilename": null
         }
       ]
+    },
+    {
+      "pullNumber": 3572,
+      "targetRef": "dev",
+      "mergeBaseSha": "275226395a5e0772edbf8f791cdd74ea3ec082d7",
+      "headSha": "4de95829712c955ff633799388c6fbbf2b08258f",
+      "owner": "Yeachan-Heo",
+      "expiresAt": "2026-08-12T00:00:00.000Z",
+      "generatedDelta": {
+        "count": 2,
+        "sha256": "7cf3f27718f502104fdc009df2e461cd633c4ebd69f62d5fcd562d244dd02530"
+      },
+      "generatedFiles": [
+        {
+          "status": "modified",
+          "filename": "bridge/cli.cjs",
+          "sha": "0d55e2fd280de2e89af53e567c8cc54445dd7fc3",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/cli/launch.js",
+          "sha": "e01b363c5cdc3d4f28072ca612b49a2db200b7d6",
+          "previousFilename": null
+        }
+      ]
     }
   ]
 }
