@@ -5,7 +5,7 @@
 import { execFileSync } from 'child_process';
 import { cpSync, copyFileSync, existsSync, lstatSync, linkSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync, } from 'fs';
 import { homedir } from 'os';
-import { basename, dirname, isAbsolute, join } from 'path';
+import { basename, dirname, isAbsolute, join, resolve } from 'path';
 import { atomicWriteJsonSync } from '../lib/atomic-write.js';
 import { lockPathFor, withFileLockSync } from '../lib/file-lock.js';
 import { resolvePluginDirArg } from '../lib/plugin-dir.js';
@@ -176,19 +176,30 @@ function credentialExpiry(parsed) {
     return typeof expiresAt === 'number' && Number.isFinite(expiresAt) ? expiresAt : null;
 }
 function resolveCredentialWritePath(path) {
-    let current = path;
-    for (let depth = 0; depth < 16; depth += 1) {
+    let current = resolve(path);
+    const visited = new Set();
+    while (true) {
+        if (visited.has(current)) {
+            throw new Error('Claude credential symlink chain contains a cycle');
+        }
+        visited.add(current);
+        let stat;
         try {
-            if (!lstatSync(current).isSymbolicLink())
+            stat = lstatSync(current);
+        }
+        catch (error) {
+            const code = error && typeof error === 'object' && 'code' in error
+                ? error.code
+                : undefined;
+            if (code === 'ENOENT' || code === 'ENOTDIR')
                 return current;
-            const target = readlinkSync(current);
-            current = isAbsolute(target) ? target : join(dirname(current), target);
+            throw error;
         }
-        catch {
+        if (!stat.isSymbolicLink())
             return current;
-        }
+        const target = readlinkSync(current);
+        current = isAbsolute(target) ? resolve(target) : resolve(dirname(current), target);
     }
-    return current;
 }
 /** True only when source and runtime can be proven to be the same account. */
 function accountsProvenSame(sourceClaudeJson, runtimeClaudeJson) {
@@ -196,19 +207,40 @@ function accountsProvenSame(sourceClaudeJson, runtimeClaudeJson) {
     const runtimeAccount = isJsonObject(runtimeClaudeJson?.oauthAccount) ? runtimeClaudeJson.oauthAccount : null;
     if (!sourceAccount || !runtimeAccount)
         return false;
+    const sourceUuid = typeof sourceAccount.accountUuid === 'string' ? sourceAccount.accountUuid.trim() : '';
+    const runtimeUuid = typeof runtimeAccount.accountUuid === 'string' ? runtimeAccount.accountUuid.trim() : '';
+    if (sourceUuid && runtimeUuid)
+        return sourceUuid === runtimeUuid;
     let compared = false;
-    for (const key of ['accountUuid', 'emailAddress', 'email']) {
+    for (const key of ['emailAddress', 'email']) {
         const sourceValue = sourceAccount[key];
         const runtimeValue = runtimeAccount[key];
-        const sourceId = typeof sourceValue === 'string' ? sourceValue.trim() : '';
-        const runtimeId = typeof runtimeValue === 'string' ? runtimeValue.trim() : '';
-        if (!sourceId || !runtimeId)
+        const sourceEmail = typeof sourceValue === 'string' ? sourceValue.trim() : '';
+        const runtimeEmail = typeof runtimeValue === 'string' ? runtimeValue.trim() : '';
+        if (!sourceEmail || !runtimeEmail)
             continue;
         compared = true;
-        if (sourceId !== runtimeId)
+        if (sourceEmail.toLowerCase() !== runtimeEmail.toLowerCase())
             return false;
     }
     return compared;
+}
+function credentialIdentitiesConflict(baseCandidate, runtimeCandidate) {
+    if (!baseCandidate)
+        return false;
+    for (const key of ['accountUuid', 'emailAddress', 'email']) {
+        const baseValue = baseCandidate.fields[key];
+        const runtimeValue = runtimeCandidate.fields[key];
+        const baseIdentity = typeof baseValue === 'string' ? baseValue.trim() : '';
+        const runtimeIdentity = typeof runtimeValue === 'string' ? runtimeValue.trim() : '';
+        if (!baseIdentity || !runtimeIdentity)
+            continue;
+        const normalizedBase = key === 'accountUuid' ? baseIdentity : baseIdentity.toLowerCase();
+        const normalizedRuntime = key === 'accountUuid' ? runtimeIdentity : runtimeIdentity.toLowerCase();
+        if (normalizedBase !== normalizedRuntime)
+            return true;
+    }
+    return false;
 }
 function compareOnboardingVersion(left, right) {
     const toParts = (value) => {
@@ -344,6 +376,9 @@ function reconcileRuntimeCredentials(baseConfigDir, runtimeCredentialsPath, sour
         return;
     // Fail closed unless both sides prove the same account identity.
     if (!accountsProvenSame(sourceClaudeJson, preservedRuntimeClaudeJson))
+        return;
+    // Credential fields may veto promotion but cannot establish account identity.
+    if (credentialIdentitiesConflict(baseInspection.candidate, runtimeCandidate))
         return;
     const mergedBaseCredentials = { ...baseInspection.parsed };
     if (hasOwn(baseInspection.parsed, 'claudeAiOauth') || runtimeCandidate.nested) {
