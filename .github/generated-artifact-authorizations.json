@@ -1215,24 +1215,24 @@
       "pullNumber": 3538,
       "targetRef": "dev",
       "mergeBaseSha": "3219495628cbf7680632f37e261351929508f295",
-      "headSha": "91244ff23963efe072cdadf6ae64adf2bd6815fd",
+      "headSha": "24e4e2f0e92dc4c4f61636d32fc411614fae3728",
       "owner": "Yeachan-Heo",
       "expiresAt": "2026-08-12T00:00:00.000Z",
       "generatedDelta": {
-        "count": 4,
-        "sha256": "6a95230f5f872775de42c2eed9a007d930afc79aed1260aa2666b285c4346f27"
+        "count": 5,
+        "sha256": "05928b05a6f218fed553ecbb17ad276d4019ba70ac97b2581c39b104b38a4fd8"
       },
       "generatedFiles": [
         {
           "status": "modified",
           "filename": "bridge/claude-md-coordinator.cjs",
-          "sha": "a14ed7b45cddee0f32c5f59b0267785cccf6d302",
+          "sha": "3e31b5e9815150c2d2e5e9cd3d803692243aa197",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/cli.cjs",
-          "sha": "de7fa172728e6ba135f7cf5bf84a61ec45e9f1c0",
+          "sha": "40089f6f49e697fe5ad1b759207855c6528e3d1c",
           "previousFilename": null
         },
         {
@@ -1244,7 +1244,13 @@
         {
           "status": "modified",
           "filename": "dist/installer/claude-md-transaction.js",
-          "sha": "6792903e324a83d1f68485b288757f2f2e61829b",
+          "sha": "8a3c29bd6cc3ee42a705c046418ebbf38234b9cb",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/installer/index.js",
+          "sha": "b56860d8f1d518b4963c5196fb8f1aa4c3740776",
           "previousFilename": null
         }
       ]
