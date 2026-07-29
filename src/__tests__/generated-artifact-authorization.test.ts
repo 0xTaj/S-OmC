@@ -255,8 +255,8 @@ describe('generated-artifact base trust root workflow', () => {
     });
     expect(manifest.authorizations.find(entry => entry.pullNumber === 3539)).toMatchObject({
       targetRef: 'dev',
-      headSha: 'e2cf59b01a6b2d3c8be0605d0cdd59c75df161dd',
-      mergeBaseSha: '77b83cdeb0c2e385bdbe71b2ab6c194b2a533cf3',
+      headSha: '719087055945fd2a55024c02587e1f7f3e35ee26',
+      mergeBaseSha: '275226395a5e0772edbf8f791cdd74ea3ec082d7',
     });
   });
 
