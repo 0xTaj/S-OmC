@@ -182,6 +182,17 @@ function cleanupTemps(operations, result, root, fs) {
             }
         }
 }
+function lstatPresent(path, fs) {
+    try {
+        fs.lstatSync(path);
+        return true;
+    }
+    catch (error) {
+        if (error.code === 'ENOENT')
+            return false;
+        throw error;
+    }
+}
 export function executeClaudeMdTransaction(request) {
     const fs = request.fs ?? defaultFs;
     let capturedRoot;
@@ -266,6 +277,7 @@ export function executeClaudeMdTransaction(request) {
                 if (operation.type === 'delete')
                     result.deletedPaths.push(operation.path);
             }
+            verifyCapturedRoot(capturedRoot, fs, true);
             result.ok = true;
             result.exitCode = 0;
             return result;
@@ -283,7 +295,7 @@ export function executeClaudeMdTransaction(request) {
                         rollbackOperations.push(rollbackOperation);
                         atomicWrite(rollbackOperation, capturedRoot, fs, false);
                     }
-                    else if (fs.existsSync(state.path)) {
+                    else if (lstatPresent(state.path, fs)) {
                         validateTransactionTarget(capturedRoot, state.path, true, fs, false);
                         fs.unlinkSync(state.path);
                     }

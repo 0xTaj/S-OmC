@@ -16178,6 +16178,15 @@ function cleanupTemps(operations, result, root2, fs22) {
     }
   }
 }
+function lstatPresent(path25, fs22) {
+  try {
+    fs22.lstatSync(path25);
+    return true;
+  } catch (error2) {
+    if (error2.code === "ENOENT") return false;
+    throw error2;
+  }
+}
 function executeClaudeMdTransaction(request) {
   const fs22 = request.fs ?? defaultFs;
   let capturedRoot;
@@ -16247,6 +16256,7 @@ function executeClaudeMdTransaction(request) {
         if (!operation.existedBefore && operation.type === "write") result.createdPaths.push(operation.path);
         if (operation.type === "delete") result.deletedPaths.push(operation.path);
       }
+      verifyCapturedRoot(capturedRoot, fs22, true);
       result.ok = true;
       result.exitCode = 0;
       return result;
@@ -16262,7 +16272,7 @@ function executeClaudeMdTransaction(request) {
             const rollbackOperation = { path: state.path, type: "write", existedBefore: true, bytes: state.bytes };
             rollbackOperations.push(rollbackOperation);
             atomicWrite(rollbackOperation, capturedRoot, fs22, false);
-          } else if (fs22.existsSync(state.path)) {
+          } else if (lstatPresent(state.path, fs22)) {
             validateTransactionTarget(capturedRoot, state.path, true, fs22, false);
             fs22.unlinkSync(state.path);
           }
@@ -18079,7 +18089,6 @@ function install(options = {}) {
       }
     }
     if (!projectScoped) {
-      const claudeMdPath = (0, import_path58.join)(CLAUDE_CONFIG_DIR, "CLAUDE.md");
       const transaction = executeClaudeMdTransaction({
         mode: "global-overwrite",
         root: CLAUDE_CONFIG_DIR,
@@ -18089,7 +18098,7 @@ function install(options = {}) {
       });
       if (!transaction.ok) throw new Error(transaction.error ?? "CLAUDE.md transaction failed");
       for (const backupPath of transaction.backups) log3(`Backed up existing CLAUDE.md to ${backupPath}`);
-      log3(transaction.operations.some((operation) => operation.existedBefore && operation.path === claudeMdPath) ? "Updated CLAUDE.md (merged with existing content)" : "Created CLAUDE.md");
+      log3(transaction.operations.some((operation) => operation.type === "write" && operation.existedBefore && (0, import_path58.basename)(operation.path) === "CLAUDE.md") ? "Updated CLAUDE.md (merged with existing content)" : "Created CLAUDE.md");
     }
     let hudScriptPath = null;
     const hudDisabledByOption = options.skipHud === true;

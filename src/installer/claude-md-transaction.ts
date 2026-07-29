@@ -182,6 +182,14 @@ function cleanupTemps(operations: readonly PlannedOperation[], result: ClaudeMdT
     try { validateTransactionTarget(root, tempPath, true, fs, false); fs.rmSync(tempPath, { force: true }); result.tempCleanup.push({ path: tempPath, ok: true }); } catch (error) { result.tempCleanup.push({ path: tempPath, ok: false, error: message(error) }); }
   }
 }
+function lstatPresent(path: string, fs: ClaudeMdTransactionFs): boolean {
+  try { fs.lstatSync(path); return true; }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 
 export function executeClaudeMdTransaction(request: ClaudeMdTransactionRequest): ClaudeMdTransactionResult {
   const fs = request.fs ?? defaultFs;
@@ -234,6 +242,7 @@ export function executeClaudeMdTransaction(request: ClaudeMdTransactionRequest):
         if (!operation.existedBefore && operation.type === 'write') result.createdPaths.push(operation.path);
         if (operation.type === 'delete') result.deletedPaths.push(operation.path);
       }
+      verifyCapturedRoot(capturedRoot, fs, true);
       result.ok = true; result.exitCode = 0; return result;
     } catch (error) {
       result.error = message(error); result.failedPhase = 'mutation'; result.failedPath = effectiveOperations.find(operation => !result.completedOperations.some(done => done.path === operation.path))?.path;
@@ -245,7 +254,10 @@ export function executeClaudeMdTransaction(request: ClaudeMdTransactionRequest):
             const rollbackOperation: PlannedOperation = { path: state.path, type: 'write', existedBefore: true, bytes: state.bytes };
             rollbackOperations.push(rollbackOperation);
             atomicWrite(rollbackOperation, capturedRoot, fs, false);
-          } else if (fs.existsSync(state.path)) { validateTransactionTarget(capturedRoot, state.path, true, fs, false); fs.unlinkSync(state.path); }
+          } else if (lstatPresent(state.path, fs)) {
+            validateTransactionTarget(capturedRoot, state.path, true, fs, false);
+            fs.unlinkSync(state.path);
+          }
           result.rollback.push({ path: state.path, ok: true });
         }
         catch (rollbackError) { result.failedPhase = 'rollback'; result.failedPath = state.path; result.rollback.push({ path: state.path, ok: false, error: message(rollbackError) }); }
