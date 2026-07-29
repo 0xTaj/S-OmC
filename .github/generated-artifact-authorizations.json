@@ -1214,25 +1214,25 @@
     {
       "pullNumber": 3538,
       "targetRef": "dev",
-      "mergeBaseSha": "10078ece166ad36332390ecbaab2d5e247852bbc",
-      "headSha": "e798c12426f1f11701dede43a0f35c183651627e",
+      "mergeBaseSha": "3219495628cbf7680632f37e261351929508f295",
+      "headSha": "91244ff23963efe072cdadf6ae64adf2bd6815fd",
       "owner": "Yeachan-Heo",
-      "expiresAt": "2026-08-05T00:00:00.000Z",
+      "expiresAt": "2026-08-12T00:00:00.000Z",
       "generatedDelta": {
         "count": 4,
-        "sha256": "aaf1c49f22f4ce08b9299432e54f708e61e37434d3af48055bf195ff0b2005e6"
+        "sha256": "6a95230f5f872775de42c2eed9a007d930afc79aed1260aa2666b285c4346f27"
       },
       "generatedFiles": [
         {
           "status": "modified",
           "filename": "bridge/claude-md-coordinator.cjs",
-          "sha": "ccab9e12230cb98627c610d015216451d9c6da7c",
+          "sha": "a14ed7b45cddee0f32c5f59b0267785cccf6d302",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/cli.cjs",
-          "sha": "102f7f2ec960a74079450bfb771fa566392f2840",
+          "sha": "de7fa172728e6ba135f7cf5bf84a61ec45e9f1c0",
           "previousFilename": null
         },
         {
