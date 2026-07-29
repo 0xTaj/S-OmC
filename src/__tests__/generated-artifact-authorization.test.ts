@@ -275,7 +275,7 @@ describe('generated-artifact base trust root workflow', () => {
     });
     expect(manifest.authorizations.find(entry => entry.pullNumber === 3588)).toMatchObject({
       targetRef: 'dev',
-      headSha: '9c625e13e53af260c75589618f2ed040c1f9eb48',
+      headSha: '3797429ede04ee4ca71e02f0821382eab7c3ddf8',
       mergeBaseSha: '3219495628cbf7680632f37e261351929508f295',
       generatedDelta: {
         count: 16,
