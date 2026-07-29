@@ -2402,7 +2402,6 @@ export function install(options: InstallOptions = {}): InstallResult {
     // Keep the public installer on the same raw-byte transaction path as setup.
     // The public string merger remains exported for callers that use it directly.
     if (!projectScoped) {
-      const claudeMdPath = join(CLAUDE_CONFIG_DIR, 'CLAUDE.md');
       const transaction = executeClaudeMdTransaction({
         mode: 'global-overwrite',
         root: CLAUDE_CONFIG_DIR,
@@ -2412,7 +2411,7 @@ export function install(options: InstallOptions = {}): InstallResult {
       });
       if (!transaction.ok) throw new Error(transaction.error ?? 'CLAUDE.md transaction failed');
       for (const backupPath of transaction.backups) log(`Backed up existing CLAUDE.md to ${backupPath}`);
-      log(transaction.operations.some(operation => operation.existedBefore && operation.path === claudeMdPath)
+      log(transaction.operations.some(operation => operation.type === 'write' && operation.existedBefore && basename(operation.path) === 'CLAUDE.md')
         ? 'Updated CLAUDE.md (merged with existing content)'
         : 'Created CLAUDE.md');
     }
