@@ -228,16 +228,25 @@ function accountsProvenSame(sourceClaudeJson, runtimeClaudeJson) {
 function credentialIdentitiesConflict(baseCandidate, runtimeCandidate) {
     if (!baseCandidate)
         return false;
-    for (const key of ['accountUuid', 'emailAddress', 'email']) {
+    const baseUuid = typeof baseCandidate.fields.accountUuid === 'string'
+        ? baseCandidate.fields.accountUuid.trim()
+        : '';
+    const runtimeUuid = typeof runtimeCandidate.fields.accountUuid === 'string'
+        ? runtimeCandidate.fields.accountUuid.trim()
+        : '';
+    if (baseUuid || runtimeUuid) {
+        return !baseUuid || !runtimeUuid || baseUuid !== runtimeUuid;
+    }
+    for (const key of ['emailAddress', 'email']) {
         const baseValue = baseCandidate.fields[key];
         const runtimeValue = runtimeCandidate.fields[key];
-        const baseIdentity = typeof baseValue === 'string' ? baseValue.trim() : '';
-        const runtimeIdentity = typeof runtimeValue === 'string' ? runtimeValue.trim() : '';
-        if (!baseIdentity || !runtimeIdentity)
+        const baseEmail = typeof baseValue === 'string' ? baseValue.trim() : '';
+        const runtimeEmail = typeof runtimeValue === 'string' ? runtimeValue.trim() : '';
+        if (!baseEmail && !runtimeEmail)
             continue;
-        const normalizedBase = key === 'accountUuid' ? baseIdentity : baseIdentity.toLowerCase();
-        const normalizedRuntime = key === 'accountUuid' ? runtimeIdentity : runtimeIdentity.toLowerCase();
-        if (normalizedBase !== normalizedRuntime)
+        if (!baseEmail || !runtimeEmail)
+            return true;
+        if (baseEmail.toLowerCase() !== runtimeEmail.toLowerCase())
             return true;
     }
     return false;
