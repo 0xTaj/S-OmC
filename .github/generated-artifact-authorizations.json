@@ -1349,24 +1349,24 @@
       "pullNumber": 3588,
       "targetRef": "dev",
       "mergeBaseSha": "3219495628cbf7680632f37e261351929508f295",
-      "headSha": "3797429ede04ee4ca71e02f0821382eab7c3ddf8",
+      "headSha": "47ce9d9aa2065bc555f88809ff04b739cced005c",
       "owner": "Yeachan-Heo",
       "expiresAt": "2026-08-12T00:00:00.000Z",
       "generatedDelta": {
-        "count": 16,
-        "sha256": "14aab96247a7aae58f4b1daaeb0364cfdaf17c7d4f548be64dc411f83a46e691"
+        "count": 20,
+        "sha256": "fd7b7719f50caaeaa0a18caf9bb15d2bff6e654344565bc7226d73da4cd493e1"
       },
       "generatedFiles": [
         {
           "status": "modified",
           "filename": "bridge/cli.cjs",
-          "sha": "89e47bf855596f40696e5daf1d2d50a9d97405b1",
+          "sha": "4efc37ae54c9c842ab629e2a099c6949afb393c2",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/runtime-cli.cjs",
-          "sha": "59a90c1a7541561c0bc111785e5fbe4a0d089ac1",
+          "sha": "b15ff9e69cfa220dc8ea0e73849ab5d876db9007",
           "previousFilename": null
         },
         {
@@ -1378,25 +1378,37 @@
         {
           "status": "modified",
           "filename": "bridge/team-mcp.cjs",
-          "sha": "9ff00457930a99b9d974fa9f80ef93e53e170cd3",
+          "sha": "ae52fb1d105f6cd50cb9e57e53b0150621a02327",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "bridge/team.js",
-          "sha": "0567b121df6d82e944db589422647dc546af57c1",
+          "sha": "55d3b8b5dfda3cfef618792044b916fecb513445",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/index.d.ts",
+          "sha": "c65765ebb43f1daec5e8b94b95345b161404b6d2",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
+          "filename": "dist/team/index.js",
+          "sha": "43cc86c51f548e902b63ed70b3c50bcd1b43deef",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/runtime-cli.d.ts",
-          "sha": "38c5b35e49e48cfbafc2ba43f091816c516b405d",
+          "sha": "e8dfded2257219ed4028cb5decdaea47914cb162",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/runtime-cli.js",
-          "sha": "4178e09fd3945d29c4131bf0eee1daeb4aa45281",
+          "sha": "7bed920ebd5855360d9ba431df7fd4abc7063bf8",
           "previousFilename": null
         },
         {
@@ -1413,8 +1425,14 @@
         },
         {
           "status": "modified",
+          "filename": "dist/team/runtime-v2.d.ts",
+          "sha": "b1a5fec4232d3b8aaec4b07a9ec9f8a089d64cf2",
+          "previousFilename": null
+        },
+        {
+          "status": "modified",
           "filename": "dist/team/runtime-v2.js",
-          "sha": "6a90c9933ceb0b4e2fa0bb8057cdcb751ee35954",
+          "sha": "fd47589f2c9f5ec0fbdfb0ef7794f5aa7857a0c3",
           "previousFilename": null
         },
         {
@@ -1432,19 +1450,25 @@
         {
           "status": "modified",
           "filename": "dist/team/tmux-session.d.ts",
-          "sha": "d10108403063553ea018fb81270c052f0cf83886",
+          "sha": "cdf9ab83baf23d232e8d754374c845062f7aa38e",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/tmux-session.js",
-          "sha": "ed6c560f4b3ecf9a7f16bca9c6ac1d7e73b27da5",
+          "sha": "cd51d3c137ed98cf3c7d13bca36c287c1a2c0a8f",
           "previousFilename": null
         },
         {
           "status": "modified",
           "filename": "dist/team/types.d.ts",
           "sha": "2a73dd4ddd1054cb9c72ef23138792d88398058a",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/team/worker-launch-ack.d.ts",
+          "sha": "22334eb31dbbfbc6335ecc81d171cbd22746b51a",
           "previousFilename": null
         },
         {
