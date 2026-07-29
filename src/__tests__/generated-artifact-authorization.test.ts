@@ -247,6 +247,7 @@ describe('generated-artifact base trust root workflow', () => {
       [3538, 'dev'],
       [3539, 'dev'],
       [3541, 'dev'],
+      [3572, 'dev'],
     ]);
     expect(manifest.authorizations.find(entry => entry.pullNumber === 3538)).toMatchObject({
       targetRef: 'dev',
@@ -257,6 +258,15 @@ describe('generated-artifact base trust root workflow', () => {
       targetRef: 'dev',
       headSha: '719087055945fd2a55024c02587e1f7f3e35ee26',
       mergeBaseSha: '275226395a5e0772edbf8f791cdd74ea3ec082d7',
+    });
+    expect(manifest.authorizations.find(entry => entry.pullNumber === 3572)).toMatchObject({
+      targetRef: 'dev',
+      headSha: '4de95829712c955ff633799388c6fbbf2b08258f',
+      mergeBaseSha: '275226395a5e0772edbf8f791cdd74ea3ec082d7',
+      generatedDelta: {
+        count: 2,
+        sha256: '7cf3f27718f502104fdc009df2e461cd633c4ebd69f62d5fcd562d244dd02530',
+      },
     });
   });
 
