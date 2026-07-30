@@ -17042,6 +17042,10 @@ function mergeHookGroups(eventType, existingGroups, newOmcGroups, options, log3,
     }
     return [...nonOmcGroups, ...newOmcGroups];
   }
+  if (existingGroups.length === 0) {
+    log3(`  Installed ${eventType} hook`);
+    return newOmcGroups;
+  }
   if (hasNonOmcHook) {
     log3(`  Warning: ${eventType} hook has non-OMC hook. Skipping. Use --force-hooks to override.`);
     result.hookConflicts.push({ eventType, existingCommand: nonOmcCommand });
