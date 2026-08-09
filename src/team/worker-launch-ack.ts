@@ -568,6 +568,10 @@ export async function materializeWorkerLaunchTransport(input: {
   cwd: string;
   providerEnv?: NodeJS.ProcessEnv | Record<string, string>;
   releaseAfterSpawn?: boolean;
+  /** Native-Windows delivery resolves a cwd-relative wrapper command. POSIX
+   *  delivery launches the runtime CLI with OMC_WORKER_LAUNCH_SPEC_FILE, so
+   *  the wrapper relative path is neither computed nor returned. */
+  windowsDelivery?: boolean;
 }): Promise<MaterializedWorkerLaunchTransport> {
   const { attempt } = input;
   if (!attemptTransportPathsAreDeterministic(attempt)) throw new Error('worker_launch_transport_paths_invalid');
@@ -575,12 +579,15 @@ export async function materializeWorkerLaunchTransport(input: {
     providerEnv: input.providerEnv,
     releaseAfterSpawn: input.releaseAfterSpawn,
   });
+  const windowsDelivery = input.windowsDelivery !== false;
   const owner: WorkerLaunchTransportOwner = {
     ...identityOf(attempt),
     kind: WORKER_LAUNCH_TRANSPORT_OWNER_KIND,
     authority_digest: spec.authority_digest,
   };
-  const wrapperRelativePath = windowsWrapperRelativePath(input.cwd, attempt.wrapperPath);
+  const wrapperRelativePath = windowsDelivery
+    ? windowsWrapperRelativePath(input.cwd, attempt.wrapperPath)
+    : '';
   const wrapper = buildWorkerLaunchWrapper(attempt);
   let ownerCreated = false;
   let descriptorCreated = false;
@@ -1556,7 +1563,11 @@ export async function runWorkerLaunchBootstrap(value: unknown): Promise<WorkerLa
       };
       const cleanupSignals: NodeJS.Signals[] = ['SIGHUP', 'SIGINT', 'SIGTERM'];
       const onBootstrapSignal = () => { void terminateProvider(); };
-      const ownsSignalLifecycle = Boolean(process.env.OMC_WORKER_LAUNCH_SPEC || process.env.OMC_WORKER_LAUNCH_SPEC_B64);
+      const ownsSignalLifecycle = Boolean(
+        process.env.OMC_WORKER_LAUNCH_SPEC
+        || process.env.OMC_WORKER_LAUNCH_SPEC_B64
+        || process.env.OMC_WORKER_LAUNCH_SPEC_FILE,
+      );
       if (ownsSignalLifecycle) {
         for (const signal of cleanupSignals) process.once(signal, onBootstrapSignal);
         void completion.finally(() => {
