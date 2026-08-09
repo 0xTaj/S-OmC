@@ -1730,6 +1730,98 @@
           "previousFilename": null
         }
       ]
+    },
+    {
+      "pullNumber": 3651,
+      "targetRef": "dev",
+      "mergeBaseSha": "d2de51d1e1b5ad3914506ea25d334fb2c7d06fc8",
+      "headSha": "4fcb4d71e1407eba2fb62e355a41298e0364536b",
+      "owner": "Yeachan-Heo",
+      "expiresAt": "2026-08-16T00:00:00.000Z",
+      "generatedDelta": {
+        "count": 13,
+        "sha256": "4d03cecddffd6713c880a4c10d4357b1189f5e55e76c2b5f91abe1e3a442d23c"
+      },
+      "generatedFiles": [
+        {
+          "status": "modified",
+          "filename": "bridge/claude-md-coordinator.cjs",
+          "sha": "9d2470ed1e8754493b478689a071ff74e2dfe14c",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/descriptor.d.ts",
+          "sha": "0ce86398621ca86f51f02f4c4c75cf4f3c5112e4",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/descriptor.js",
+          "sha": "f738a965d033c4f03513bb95503b9e7190efb981",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/index.d.ts",
+          "sha": "3d6a726347026939eb721de09e7d1d479f6ae2ed",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/index.js",
+          "sha": "e43a84a4dfbc2f7ba2880e09a4a7e30c783b2288",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/scheduler.d.ts",
+          "sha": "dfaf2eab292b119ca3ee09b12ebd644aa807ccae",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/scheduler.js",
+          "sha": "cf1d0ab516d4167ad18bd435380d1c486a9512fd",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/schema.d.ts",
+          "sha": "8ca025e94723464eb9bce83cce58c8dadbcd6c1a",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/schema.js",
+          "sha": "f8c0e2d28df3f0f41eaf881a5959a70ca458476a",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/types.d.ts",
+          "sha": "847eee9a34bcf20b1eff77d4cb536632a8339fca",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/graph/types.js",
+          "sha": "310bb754cb2fe67e5529915d61b0662f00363b4c",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/team/worker-launch-ack.d.ts",
+          "sha": "c1fb816da347e13bb6d3d048a28d39087310bea2",
+          "previousFilename": null
+        },
+        {
+          "status": "added",
+          "filename": "dist/team/worker-launch-ack.js",
+          "sha": "2749a93fcd898afc9bb89b3df344fe450cc80e40",
+          "previousFilename": null
+        }
+      ]
     }
   ]
 }
