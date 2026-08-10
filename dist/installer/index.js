@@ -489,6 +489,51 @@ export function isProjectScopedPlugin() {
     const normalizedGlobalBase = globalPluginBase.replace(/\\/g, '/').replace(/\/$/, '');
     return !normalizedPluginRoot.startsWith(normalizedGlobalBase);
 }
+function isObjectRecord(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+function filterSettingsPluginDuplicateHooks(hooks, commandsByEvent) {
+    const filteredHooks = Object.create(null);
+    const removedByEvent = new Map();
+    let removed = 0;
+    for (const [eventType, groups] of Object.entries(hooks)) {
+        if (!Array.isArray(groups)) {
+            filteredHooks[eventType] = groups;
+            continue;
+        }
+        const eventCommands = commandsByEvent.get(eventType);
+        const filteredGroups = [];
+        for (const group of groups) {
+            if (!isObjectRecord(group) || !Array.isArray(group.hooks)) {
+                filteredGroups.push(group);
+                continue;
+            }
+            const groupHooks = group.hooks;
+            const survivingHooks = groupHooks.filter(entry => {
+                if (!eventCommands || !isObjectRecord(entry))
+                    return true;
+                const hook = entry;
+                const isDuplicate = hook.type === 'command'
+                    && typeof hook.command === 'string'
+                    && eventCommands.has(hook.command);
+                if (isDuplicate) {
+                    removed++;
+                    removedByEvent.set(eventType, (removedByEvent.get(eventType) ?? 0) + 1);
+                }
+                return !isDuplicate;
+            });
+            if (survivingHooks.length === 0)
+                continue;
+            filteredGroups.push(survivingHooks.length === groupHooks.length
+                ? group
+                : { ...group, hooks: survivingHooks });
+        }
+        if (filteredGroups.length > 0) {
+            filteredHooks[eventType] = filteredGroups;
+        }
+    }
+    return { hooks: filteredHooks, removed, removedByEvent };
+}
 function pruneLegacyStandaloneHookScripts(log, activeStandaloneOmcHookFilenames = new Set()) {
     if (!existsSync(HOOKS_DIR)) {
         return;
@@ -546,7 +591,24 @@ function pruneLegacyStandaloneHookScripts(log, activeStandaloneOmcHookFilenames 
 function configureInstallerSettings(baseSettings, context) {
     let settings = { ...baseSettings };
     {
-        const existingHooks = { ...(settings.hooks || {}) };
+        let existingHooks = { ...(settings.hooks || {}) };
+        const enabledOmcPlugin = context.runningAsPlugin || isOmcPluginEnabledInSettings(settings);
+        const pluginHandlesHooks = context.pluginProvidesHookFiles && enabledOmcPlugin;
+        if (pluginHandlesHooks) {
+            const snapshot = collectPluginHookManifestSnapshot();
+            if (snapshot.valid) {
+                const filtered = filterSettingsPluginDuplicateHooks(existingHooks, snapshot.commandsByEvent);
+                existingHooks = filtered.hooks;
+                if (filtered.removed > 0) {
+                    context.log(`  Removed ${filtered.removed} stale plugin duplicate hook entr${filtered.removed === 1 ? 'y' : 'ies'} from settings.json (events: ${[...filtered.removedByEvent.keys()].sort().join(', ')})`);
+                }
+            }
+            else {
+                for (const diagnostic of snapshot.diagnostics) {
+                    context.log(`  Skipped plugin duplicate-hook cleanup: ${diagnostic}`);
+                }
+            }
+        }
         let legacyRemoved = 0;
         for (const [eventType, groups] of Object.entries(existingHooks)) {
             const groupList = groups;
@@ -568,8 +630,6 @@ function configureInstallerSettings(baseSettings, context) {
         if (legacyRemoved > 0) {
             context.log(`  Cleaned up ${legacyRemoved} legacy hook entries from settings.json`);
         }
-        const enabledOmcPlugin = context.runningAsPlugin || isOmcPluginEnabledInSettings(settings);
-        const pluginHandlesHooks = context.pluginProvidesHookFiles && enabledOmcPlugin;
         if (pluginHandlesHooks) {
             const activeStandaloneOmcHookFilenames = collectActiveStandaloneOmcHookFilenames(existingHooks);
             pruneLegacyStandaloneHookScripts(context.log, activeStandaloneOmcHookFilenames);
@@ -1265,6 +1325,103 @@ export function validatePluginCachePayload(root) {
 }
 function hasCompletePluginPayload(root) {
     return validatePluginSyncPayload(root).length === 0;
+}
+function collectPluginHookManifestSnapshot() {
+    const resolution = resolveInstalledOmcPluginRoots();
+    if (resolution.mode !== 'plugin' || !resolution.cleanupAllowed) {
+        return {
+            valid: false,
+            commandsByEvent: new Map(),
+            diagnostics: [`plugin root resolution is ${resolution.mode} (cleanupAllowed=${resolution.cleanupAllowed}, roots=${resolution.mode === 'plugin' ? resolution.roots.join(',') : 'none'})`],
+        };
+    }
+    const snapshots = [];
+    for (const root of resolution.roots) {
+        if (!hasCompletePluginPayload(root)) {
+            return {
+                valid: false,
+                commandsByEvent: new Map(),
+                diagnostics: [`${root}: incomplete plugin payload`],
+            };
+        }
+        let raw;
+        try {
+            raw = JSON.parse(readFileSync(join(root, 'hooks', 'hooks.json'), 'utf-8'));
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return {
+                valid: false,
+                commandsByEvent: new Map(),
+                diagnostics: [`${root}: invalid hooks/hooks.json: ${message}`],
+            };
+        }
+        if (!isObjectRecord(raw) || !isObjectRecord(raw.hooks)) {
+            return {
+                valid: false,
+                commandsByEvent: new Map(),
+                diagnostics: [`${root}: hooks/hooks.json must contain a hooks object`],
+            };
+        }
+        const commandsByEvent = new Map();
+        for (const [eventType, groups] of Object.entries(raw.hooks)) {
+            if (!Array.isArray(groups)) {
+                return {
+                    valid: false,
+                    commandsByEvent: new Map(),
+                    diagnostics: [`${root}: hooks.${eventType} must be an array`],
+                };
+            }
+            const commands = new Set();
+            for (const group of groups) {
+                if (!isObjectRecord(group) || !Array.isArray(group.hooks)) {
+                    return {
+                        valid: false,
+                        commandsByEvent: new Map(),
+                        diagnostics: [`${root}: hooks.${eventType} contains an invalid hook group`],
+                    };
+                }
+                for (const entry of group.hooks) {
+                    if (!isObjectRecord(entry)) {
+                        return {
+                            valid: false,
+                            commandsByEvent: new Map(),
+                            diagnostics: [`${root}: hooks.${eventType} contains an invalid hook entry`],
+                        };
+                    }
+                    if (entry.type !== 'command')
+                        continue;
+                    if (typeof entry.command !== 'string') {
+                        return {
+                            valid: false,
+                            commandsByEvent: new Map(),
+                            diagnostics: [`${root}: hooks.${eventType} contains a command hook without a string command`],
+                        };
+                    }
+                    commands.add(entry.command);
+                }
+            }
+            if (commands.size > 0)
+                commandsByEvent.set(eventType, commands);
+        }
+        snapshots.push(commandsByEvent);
+    }
+    const normalizeSnapshot = (snapshot) => JSON.stringify([...snapshot.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([eventType, commands]) => [eventType, [...commands].sort()]));
+    const expected = snapshots[0];
+    if (!expected) {
+        return { valid: false, commandsByEvent: new Map(), diagnostics: ['no plugin roots resolved'] };
+    }
+    const expectedNormalized = normalizeSnapshot(expected);
+    if (snapshots.some(snapshot => normalizeSnapshot(snapshot) !== expectedNormalized)) {
+        return {
+            valid: false,
+            commandsByEvent: new Map(),
+            diagnostics: [`installed plugin hook manifests disagree: ${resolution.roots.join(', ')}`],
+        };
+    }
+    return { valid: true, commandsByEvent: expected, diagnostics: [] };
 }
 function countPluginSyncPayloadEntries(root) {
     let score = 0;

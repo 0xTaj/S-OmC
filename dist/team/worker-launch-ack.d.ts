@@ -116,6 +116,10 @@ export declare function materializeWorkerLaunchTransport(input: {
     cwd: string;
     providerEnv?: NodeJS.ProcessEnv | Record<string, string>;
     releaseAfterSpawn?: boolean;
+    /** Native-Windows delivery resolves a cwd-relative wrapper command. POSIX
+     *  delivery launches the runtime CLI with OMC_WORKER_LAUNCH_SPEC_FILE, so
+     *  the wrapper relative path is neither computed nor returned. */
+    windowsDelivery?: boolean;
 }): Promise<MaterializedWorkerLaunchTransport>;
 export declare function cleanupWorkerLaunchTransport(attempt: WorkerLaunchAttempt, reason?: string): Promise<boolean>;
 export declare function readAndConsumeWorkerLaunchDescriptor(descriptorPath: string): Promise<unknown>;
